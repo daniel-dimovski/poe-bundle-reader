@@ -22,6 +22,29 @@ fn decompress(source: *const u8, src_len: usize, destination: *mut u8, dst_size:
     }
 }
 
+pub struct Bundle {
+    pub name: String,
+    pub uncompressed_size: u32,
+}
+
+pub struct File {
+    pub bundle_index: u32,
+    pub offset: u32,
+    pub size: u32,
+}
+
+pub struct PathRep {
+    pub payload_offset: u32,
+    pub payload_size: u32,
+    pub payload_recursive_size: u32,
+}
+
+pub struct Index {
+    pub bundles: HashMap<u32, Bundle>,
+    pub files: HashMap<u64, File>,
+    pub path_reps: HashMap<u64, PathRep>,
+}
+
 pub fn read_index<F>(data: &[u8], callback: F)
 where
     F: Fn(&Index, Vec<String>),
@@ -63,14 +86,6 @@ where
     });
 }
 
-fn read_utf8(c: &mut Cursor<&[u8]>) -> Result<String, FromUtf8Error> {
-    let raw_bytes = (0..)
-        .map(|_| c.read_u8().unwrap())
-        .take_while(|&x| x != 0u8)
-        .collect::<Vec<u8>>();
-    return String::from_utf8(raw_bytes);
-}
-
 pub fn unpack<F>(data: &[u8], callback: F)
 where
     F: Fn(&[u8]),
@@ -101,17 +116,18 @@ where
     let mut bytes_to_read = uncompressed_size;
     let mut output = Vec::with_capacity(usize::try_from(uncompressed_size).unwrap());
 
+    // multithread decompression
     (0..chunk_count as usize).for_each(|index| {
         let src = &data[chunk_offset..chunk_offset + chunk_sizes[index]];
         let dst_size = cmp::min(bytes_to_read, chunk_unpacked_size) as usize;
-        let mut dst = vec![0u8; dst_size];
+        let mut dst = vec![0u8; dst_size+64];
 
         let wrote = decompress(src.as_ptr(), chunk_sizes[index], dst.as_mut_ptr(), dst_size);
         if wrote < 0 {
             println!("Decompress returned: {} Expected: {}", wrote, dst_size);
             println!("first byte of index({}) {} {}", index, src[0], src[1]);
         }
-        output.write(dst.as_slice()).unwrap();
+        output.write(&dst[0..dst_size]).unwrap();
 
         if bytes_to_read > chunk_unpacked_size {
             bytes_to_read -= chunk_unpacked_size;
@@ -122,31 +138,6 @@ where
     callback(output.as_slice());
 }
 
-pub struct Bundle {
-    pub name: String,
-    pub uncompressed_size: u32,
-}
-
-pub struct File {
-    pub bundle_index: u32,
-    pub offset: u32,
-    pub size: u32,
-}
-
-pub struct PathRep {
-    pub payload_offset: u32,
-    pub payload_size: u32,
-    pub payload_recursive_size: u32,
-}
-
-pub struct Index {
-    pub bundles: HashMap<u32, Bundle>,
-    pub files: HashMap<u64, File>,
-    pub path_reps: HashMap<u64, PathRep>,
-}
-
-// TODO: create structs for the index data and return
-// TODO: split workload across cores
 fn read_index_headers<F>(data: &[u8], callback: F)
 where
     F: Fn(&Index, &[u8]),
@@ -207,7 +198,17 @@ where
         files,
         path_reps,
     };
+
+    // multithread generation?
     unpack(remainder, |bytes| {
         callback(&index_data, bytes);
     });
+}
+
+fn read_utf8(c: &mut Cursor<&[u8]>) -> Result<String, FromUtf8Error> {
+    let raw_bytes = (0..)
+        .map(|_| c.read_u8().unwrap())
+        .take_while(|&x| x != 0u8)
+        .collect::<Vec<u8>>();
+    return String::from_utf8(raw_bytes);
 }
