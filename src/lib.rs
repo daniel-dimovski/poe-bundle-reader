@@ -43,54 +43,27 @@ pub struct Index {
     pub bundles: HashMap<u32, Bundle>,
     pub files: HashMap<u64, File>,
     pub path_reps: HashMap<u64, PathRep>,
+    pub paths: Vec<String>,
 }
 
-pub fn read_index<F>(data: &[u8], callback: F)
-where
-    F: Fn(&Index, Vec<String>),
-{
-    unpack(&data, |bytes| {
-        read_index_headers(&bytes, |index_data, remaining_bytes| {
-            let mut c = Cursor::new(remaining_bytes);
+// --- internal to DatFile::source
+// let reader = poe_bundle_reader.read('/games/Path of Exile/') // returns an object for grabbing data
+// let bytes = reader.get("Data/Mods.dat") // return uncompressed &[u8] of the file
+// TODO: make them lazy + cached (optional?)
 
-            let mut generation_phase = false;
-            let mut table = vec![];
-            let mut files = vec![];
+// ---------------------
+// let dat_reader = DatFile::source("/games/Path of Exile/") // creates poe_bundle_reader object
+// dat.read("Data/Mods.dat") // DatFile object (with access to the dat_reader internally for following links)
 
-            while c.position() + 4 <= remaining_bytes.len() as u64 {
-                let index = c.read_u32::<LittleEndian>().unwrap() as usize;
-
-                if index == 0 {
-                    generation_phase = !generation_phase;
-                    if generation_phase {
-                        table.clear();
-                    }
-                }
-
-                if index > 0 {
-                    let mut text = read_utf8(&mut c).unwrap();
-                    if index <= table.len() {
-                        text = format!("{}{}", table[index - 1], text);
-                    }
-
-                    if generation_phase {
-                        table.push(text)
-                    } else {
-                        files.push(text);
-                    }
-                }
-            }
-
-            callback(index_data, files);
-        });
-    });
+pub fn read_index(data: &[u8]) -> Index {
+    let size = unpack(&data, &mut Vec::with_capacity(0));
+    let mut dst = Vec::with_capacity(size);
+    unpack(&data, &mut dst);
+    build_index(&dst)
 }
 
-pub fn unpack<F>(data: &[u8], callback: F)
-where
-    F: Fn(&[u8]),
-{
-    let mut c = Cursor::new(data);
+pub fn unpack(src: &[u8], dst: &mut Vec<u8>) -> usize {
+    let mut c = Cursor::new(src);
 
     let _ = c.read_u32::<LittleEndian>().unwrap(); // total size (uncompressed)
     let _ = c.read_u32::<LittleEndian>().unwrap(); // total size (compressed)
@@ -107,6 +80,10 @@ where
     let _ = c.read_u32::<LittleEndian>().unwrap(); // unknown
     let _ = c.read_u32::<LittleEndian>().unwrap(); // unknown
 
+    if dst.capacity() < uncompressed_size as usize {
+        return uncompressed_size as usize;
+    }
+
     let chunk_sizes = (0..chunk_count)
         .map(|_| c.read_u32::<LittleEndian>().unwrap())
         .map(|size| usize::try_from(size).unwrap())
@@ -114,34 +91,29 @@ where
 
     let mut chunk_offset = usize::try_from(c.position()).unwrap();
     let mut bytes_to_read = uncompressed_size;
-    let mut output = Vec::with_capacity(usize::try_from(uncompressed_size).unwrap());
 
     // multithread decompression
     (0..chunk_count as usize).for_each(|index| {
-        let src = &data[chunk_offset..chunk_offset + chunk_sizes[index]];
+        let src = &src[chunk_offset..chunk_offset + chunk_sizes[index]];
         let dst_size = cmp::min(bytes_to_read, chunk_unpacked_size) as usize;
-        let mut dst = vec![0u8; dst_size+64];
 
-        let wrote = decompress(src.as_ptr(), chunk_sizes[index], dst.as_mut_ptr(), dst_size);
+        let mut chunk_dst = vec![0u8; dst_size + 64];
+        let wrote = decompress(src.as_ptr(), chunk_sizes[index], chunk_dst.as_mut_ptr(), dst_size);
         if wrote < 0 {
             println!("Decompress returned: {} Expected: {}", wrote, dst_size);
             println!("first byte of index({}) {} {}", index, src[0], src[1]);
         }
-        output.write(&dst[0..dst_size]).unwrap();
+        dst.write(&chunk_dst[0..dst_size]).unwrap();
 
         if bytes_to_read > chunk_unpacked_size {
             bytes_to_read -= chunk_unpacked_size;
         }
         chunk_offset = chunk_offset + chunk_sizes[index];
     });
-
-    callback(output.as_slice());
+    return 0;
 }
 
-fn read_index_headers<F>(data: &[u8], callback: F)
-where
-    F: Fn(&Index, &[u8]),
-{
+fn build_index(data: &[u8]) -> Index {
     let mut c = Cursor::new(data);
     let bundle_count = c.read_u32::<LittleEndian>().unwrap();
 
@@ -152,7 +124,7 @@ where
                 .map(|_| c.read_u8().unwrap())
                 .collect::<Vec<u8>>();
             let uncompressed_size = c.read_u32::<LittleEndian>().unwrap();
-            (
+            ( // TODO: clean up
                 index,
                 Bundle {
                     name: str::from_utf8(name.as_slice()).unwrap().to_string(),
@@ -192,17 +164,50 @@ where
         })
         .collect();
 
-    let remainder = &data[c.position() as usize..];
-    let index_data = Index {
+    let remaining_bytes = &data[c.position() as usize..];
+    let size = unpack(&remaining_bytes, &mut Vec::with_capacity(0));
+    let mut dst = Vec::with_capacity(size);
+    unpack(&remaining_bytes, &mut dst);
+
+    Index {
         bundles,
         files,
         path_reps,
-    };
+        paths: build_paths(dst.as_slice()),
+    }
+}
 
-    // multithread generation?
-    unpack(remainder, |bytes| {
-        callback(&index_data, bytes);
-    });
+fn build_paths(bytes: &[u8]) -> Vec<String> {
+    let mut c = Cursor::new(bytes);
+
+    let mut generation_phase = false;
+    let mut table = vec![];
+    let mut files = vec![];
+
+    while c.position() + 4 <= bytes.len() as u64 {
+        let index = c.read_u32::<LittleEndian>().unwrap() as usize;
+
+        if index == 0 {
+            generation_phase = !generation_phase;
+            if generation_phase {
+                table.clear();
+            }
+        }
+
+        if index > 0 {
+            let mut text = read_utf8(&mut c).unwrap();
+            if index <= table.len() {
+                text = format!("{}{}", table[index - 1], text);
+            }
+
+            if generation_phase {
+                table.push(text)
+            } else {
+                files.push(text);
+            }
+        }
+    }
+    files
 }
 
 fn read_utf8(c: &mut Cursor<&[u8]>) -> Result<String, FromUtf8Error> {
