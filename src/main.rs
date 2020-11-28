@@ -1,11 +1,11 @@
-use poe_bundle_reader::read_index;
+use poe_bundle_reader::reader::BundleReader;
+use poe_bundle_reader::reader::BundleReaderRead;
 
 fn main() {
-    let data = std::fs::read("/Users/nihil/Downloads/index.bin").expect("Unable to read file");
-    let index = read_index(data.as_slice());
+    let reader = BundleReader::from_install("/Users/nihil/code/poe-files");
+    let size = reader.size_of("Data/Mods.dat").unwrap();
 
-    println!("Got {} bundles",index.bundles.len());
-    println!("Got {} files",index.files.len());
-    println!("Got {} path_reps",index.path_reps.len());
-    println!("Got {} filepaths", index.paths.len());
+    let mut dst = Vec::with_capacity(size);
+    reader.write_into("Data/Mods.dat", &mut dst).unwrap();
+    println!("got mods data {}", dst.len())
 }
