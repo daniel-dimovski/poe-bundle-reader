@@ -47,10 +47,10 @@ pub struct BundleIndex {
     pub paths: Vec<String>,
 }
 
-pub struct BundleReader<'a> {
+pub struct BundleReader {
     install_path: String,
     index: BundleIndex,
-    ggpk: GGPK<'a>,
+    ggpk: GGPK,
 }
 
 pub trait BundleFileRead {
@@ -62,18 +62,18 @@ pub trait BundleReaderRead {
     fn write_into(&self, file: &str, dst: &mut impl Write) -> Result<usize, Error>;
 }
 
-impl BundleReader<'_> {
+impl BundleReader {
     pub fn from_install(path: &str) -> BundleReader {
         let index_bytes = BundleIndex::get_file(path, "Bundles2/_.index.bin");
 
         BundleReader {
-            ggpk: GGPK::from_install(path),
+            ggpk: GGPK::from_install(path).unwrap(),
             install_path: path.to_string(),
             index: BundleIndex::read_index(index_bytes.as_slice()),
         }
     }
 }
-impl BundleReaderRead for BundleReader<'_> {
+impl BundleReaderRead for BundleReader {
     fn size_of(&self, file: &str) -> Option<usize> {
         self.index.get(file).map(|file| file.size as usize)
     }
@@ -126,7 +126,7 @@ impl BundleIndex {
         if Path::new(format!("{}/", disk_path).as_str()).exists() {
             fs::read(disk_path).expect("Unable to read")
         } else {
-            let ggpk = GGPK::from_install(install_path);
+            let ggpk = GGPK::from_install(install_path).unwrap();
             let file = ggpk.get_file(file_path);
             let mut dst = Vec::with_capacity(file.record.bytes as usize);
             file.write_into(&mut dst).unwrap();
