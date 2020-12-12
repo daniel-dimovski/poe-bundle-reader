@@ -290,7 +290,6 @@ dependencies = [
  "memmap",
  "rand",
  "rayon",
- "simplelog",
 ]
 
 [[package]]
