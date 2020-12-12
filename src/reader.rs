@@ -8,6 +8,7 @@ use std::string::FromUtf8Error;
 
 extern crate libc;
 use std::{cmp, str};
+use log::*;
 
 use super::util;
 use ggpk::file::GGPKFileFn;
@@ -183,6 +184,7 @@ fn unpack(src: &[u8], dst: &mut Vec<u8>) -> usize {
         let src = &src[chunk_offset..chunk_offset + chunk_sizes[index]];
         let dst_size = cmp::min(bytes_to_read, chunk_unpacked_size) as usize;
 
+        trace!("Decompressing chunk: {}/{}", index, chunk_count);
         let mut chunk_dst = vec![0u8; dst_size];
         let wrote = decompress(
             src.as_ptr(),
@@ -191,8 +193,8 @@ fn unpack(src: &[u8], dst: &mut Vec<u8>) -> usize {
             dst_size,
         );
         if wrote < 0 {
-            println!("Decompress returned: {} Expected: {}", wrote, dst_size);
-            println!("first byte of index({}) {} {}", index, src[0], src[1]);
+            warn!("Decompression failed with code: {}", wrote);
+            warn!("Chunk header: [{},{}]", src[0], src[1]);
         }
         dst.write(&chunk_dst[0..dst_size]).unwrap();
 
@@ -205,6 +207,7 @@ fn unpack(src: &[u8], dst: &mut Vec<u8>) -> usize {
 }
 
 fn build_index(data: &[u8]) -> BundleIndex {
+    debug!("Building bundle index");
     let mut c = Cursor::new(data);
     let bundle_count = c.read_u32::<LittleEndian>().unwrap();
 
@@ -260,6 +263,7 @@ fn build_index(data: &[u8]) -> BundleIndex {
 }
 
 fn build_paths(bytes: &[u8]) -> Vec<String> {
+    debug!("Generating bundle filepaths");
     let mut c = Cursor::new(bytes);
 
     let mut generation_phase = false;
@@ -289,6 +293,7 @@ fn build_paths(bytes: &[u8]) -> Vec<String> {
             }
         }
     }
+    debug!("Generated {} filepaths", files.len());
     files
 }
 
