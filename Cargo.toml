@@ -18,3 +18,6 @@ clap = "2.33.3"
 rayon = "1.5.0"
 rand = "0.7.3"
 libc = "0.2.0"
+
+[build-dependencies]
+cmake = "0.1.45"
