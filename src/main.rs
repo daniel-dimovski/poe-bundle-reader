@@ -1,5 +1,5 @@
-use poe_bundle_reader::reader::BundleReader;
-use poe_bundle_reader::reader::BundleReaderRead;
+use poe_bundle::reader::BundleReader;
+use poe_bundle::reader::BundleReaderRead;
 
 fn main() {
     let reader = BundleReader::from_install("/Users/nihil/code/poe-files");

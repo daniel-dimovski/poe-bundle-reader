@@ -1,11 +1,9 @@
 [package]
-name = "poe_bundle_reader"
+name = "poe_bundle"
 version = "1.0.0"
 authors = ["Daniel Dimovski <daniel.k.dimovski@gmail.com>"]
 edition = "2018"
 links = "libooz"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 ggpk = { git = "https://github.com/daniel-dimovski/ggpk", branch = "master" }

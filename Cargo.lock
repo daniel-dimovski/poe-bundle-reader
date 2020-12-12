@@ -277,7 +277,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "poe_bundle_reader"
+name = "poe_bundle"
 version = "1.0.0"
 dependencies = [
  "base64",
