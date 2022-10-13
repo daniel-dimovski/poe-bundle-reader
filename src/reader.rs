@@ -124,7 +124,7 @@ impl BundleReaderRead for BundleReader {
 impl BundleIndex {
     fn get_file(install_path: &str, file_path: &str) -> Vec<u8> {
         let disk_path = format!("{}/{}", install_path, file_path);
-        if Path::new(format!("{}/", disk_path).as_str()).exists() {
+        if Path::new(format!("{}", disk_path).as_str()).exists() {
             fs::read(disk_path).expect("Unable to read")
         } else {
             let ggpk = GGPK::from_install(install_path).unwrap();
