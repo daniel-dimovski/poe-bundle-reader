@@ -11,9 +11,9 @@ use std::{cmp, str};
 use log::*;
 
 use super::util;
-use ggpk::file::GGPKFileFn;
-use ggpk::{GGPKRead, GGPK};
+
 use std::io::Error;
+use ggpk::GGPK;
 
 // bundle implementation discussion
 // https://github.com/poe-tool-dev/ggpk.discussion/wiki/Bundle-scheme
@@ -68,7 +68,7 @@ impl BundleReader {
         let index_bytes = BundleIndex::get_file(path, "Bundles2/_.index.bin");
 
         BundleReader {
-            ggpk: GGPK::from_install(path).unwrap(),
+            ggpk: GGPK::from_path(path).unwrap(),
             install_path: path.to_string(),
             index: BundleIndex::read_index(index_bytes.as_slice()),
         }
@@ -127,7 +127,7 @@ impl BundleIndex {
         if Path::new(format!("{}", disk_path).as_str()).exists() {
             fs::read(disk_path).expect("Unable to read")
         } else {
-            let ggpk = GGPK::from_install(install_path).unwrap();
+            let ggpk = GGPK::from_path(install_path).expect(install_path);
             let file = ggpk.get_file(file_path);
             let mut dst = Vec::with_capacity(file.record.bytes as usize);
             file.write_into(&mut dst).unwrap();
