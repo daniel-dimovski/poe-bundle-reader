@@ -7,5 +7,4 @@ fn main() {
 
     println!("cargo:rustc-link-search=native={}", format!("{}/build", dst.display()));
     println!("cargo:rustc-link-lib=static=libooz");
-
 }

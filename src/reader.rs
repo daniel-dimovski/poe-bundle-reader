@@ -50,7 +50,7 @@ pub struct BundleIndex {
 
 pub struct BundleReader {
     install_path: String,
-    index: BundleIndex,
+    pub index: BundleIndex,
     ggpk: GGPK,
 }
 
@@ -61,6 +61,7 @@ pub trait BundleFileRead {
 pub trait BundleReaderRead {
     fn size_of(&self, file: &str) -> Option<usize>;
     fn write_into(&self, file: &str, dst: &mut impl Write) -> Result<usize, Error>;
+    fn bytes(&self, file: &str) -> Result<Vec<u8>, Error>;
 }
 
 impl BundleReader {
@@ -116,6 +117,49 @@ impl BundleReaderRead for BundleReader {
                             ))
                         })
                 }
+            })
+            .unwrap()
+    }
+
+    fn bytes(&self, file: &str) -> Result<Vec<u8>, Error> {
+        self.index
+            .get(file)
+            .map(|file| {
+                let mut dst = Vec::with_capacity(file.size as usize);
+                let bundle_path = format!("Bundles2/{}.bundle.bin", file.bundle_path);
+                let fs_path = format!("{}/{}", self.install_path, bundle_path);
+                if Path::new(fs_path.as_str()).exists() {
+                    fs::read(fs_path.as_str()).and_then(|bytes| {
+                        let size = unpack(&bytes, &mut Vec::with_capacity(0));
+                        let mut unpacked = Vec::with_capacity(size);
+                        unpack(&bytes, &mut unpacked);
+                        dst.write(
+                            &unpacked
+                                [file.offset as usize..(file.offset as usize + file.size as usize)],
+                        )
+                    })?;
+                } else {
+                    let bundle = self.ggpk.get_file(bundle_path.as_str());
+                    self.ggpk
+                        .mmap
+                        .get(bundle.record.begin..(bundle.record.begin + bundle.record.bytes as usize))
+                        .map(|bytes| {
+                            let size = unpack(&bytes, &mut Vec::with_capacity(0));
+                            let mut unpacked = Vec::with_capacity(size);
+                            unpack(&bytes, &mut unpacked);
+                            dst.write(
+                                &unpacked[file.offset as usize
+                                    ..(file.offset as usize + file.size as usize)],
+                            )
+                        })
+                        .unwrap_or_else(|| {
+                            Err(Error::new(
+                                std::io::ErrorKind::InvalidData,
+                                "Read outside GGPK",
+                            ))
+                        })?;
+                }
+                Ok(dst)
             })
             .unwrap()
     }
