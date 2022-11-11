@@ -1,9 +1,11 @@
 [package]
 name = "poe_bundle"
-version = "0.0.0"
+version = "0.1.0"
 authors = ["Daniel Dimovski <daniel@dicode.se>"]
 edition = "2018"
+description = "Library for extracting Oodle bundles used by the game Path of Exile"
 links = "libooz"
+license = "LGPL-3.0-only"
 
 [dependencies]
 ggpk = "1.2.1"
