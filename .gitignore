@@ -2,3 +2,6 @@
 /.vscode/
 .DS_Store
 *.log
+/.idea
+/dat_dump
+*.dat

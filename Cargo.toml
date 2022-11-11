@@ -6,7 +6,7 @@ edition = "2018"
 links = "libooz"
 
 [dependencies]
-ggpk = { git = "https://github.com/daniel-dimovski/ggpk", branch = "master" }
+ggpk = "1.2.1"
 byteorder = "1.3.4"
 log = "0.4.11"
 libc = "0.2.0"
