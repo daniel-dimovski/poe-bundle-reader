@@ -1,7 +1,4 @@
 use std::collections::HashMap;
-use std::fs;
-use std::io::{Error, Write};
-use std::path::Path;
 use std::time::Instant;
 use poe_bundle::reader::BundleReader;
 use poe_bundle::reader::BundleReaderRead;
@@ -10,7 +7,7 @@ use poe_bundle::reader::BundleReaderRead;
 fn main() {
     let ts = Instant::now();
     let reader = BundleReader::from_install(r#"/home/nihil/Games/path-of-exile/drive_c/Program Files (x86)/Grinding Gear Games/Path of Exile"#);
-    let size = reader.size_of("Data/Mods.dat").unwrap();
+    let _size = reader.size_of("Data/Mods.dat").unwrap();
 
     println!("Read index: {} ms", ts.elapsed().as_millis());
 

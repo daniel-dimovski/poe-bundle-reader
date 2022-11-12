@@ -27,9 +27,11 @@
 #define _BitScanForward(dst, x) (*(dst) = __builtin_ctz(x))
 #define _BitScanReverse(dst, x) (*(dst) = (__builtin_clz(x) ^ 31))
 
+#ifndef __MINGW32__
 static inline uint32_t _rotl(uint32_t x, int n) {
   return (((x) << (n)) | ((x) >> (32-(n))));
 }
+#endif
 
 #include <xmmintrin.h>
 #endif
