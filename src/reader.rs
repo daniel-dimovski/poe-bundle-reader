@@ -71,9 +71,9 @@ impl BundleReader {
         let ggpk = if path.join("Bundles2/_.index.bin").exists() {
             None
         } else if path.is_file() {
-            Some(GGPK::from_file(path.to_str().unwrap()).unwrap())
+            Some(GGPK::from_file(path).unwrap())
         } else {
-            Some(GGPK::from_path(path.to_str().unwrap()).unwrap())
+            Some(GGPK::from_path(path).unwrap())
         };
 
         BundleReader {
@@ -180,13 +180,13 @@ impl BundleIndex {
         if extracted_file.exists() {
             fs::read(extracted_file).expect("Unable to read")
         } else if install_path.is_file() {
-            let ggpk = GGPK::from_file(&install_path.to_string_lossy().to_string()).expect("Unable to read GGPK");
+            let ggpk = GGPK::from_file(&install_path).expect("Unable to read GGPK");
             let file = ggpk.get_file(file_path);
             let mut dst = Vec::with_capacity(file.record.bytes as usize);
             file.write_into(&mut dst).unwrap();
             dst
         } else {
-            let ggpk = GGPK::from_path(install_path.to_str().unwrap()).expect("Unable to read GGPK");
+            let ggpk = GGPK::from_path(install_path).expect("Unable to read GGPK");
             let file = ggpk.get_file(file_path);
             let mut dst = Vec::with_capacity(file.record.bytes as usize);
             file.write_into(&mut dst).unwrap();
