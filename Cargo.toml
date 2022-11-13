@@ -1,6 +1,6 @@
 [package]
 name = "poe_bundle"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Daniel Dimovski <daniel@dicode.se>"]
 edition = "2021"
 description = "Library for extracting Oodle bundles used by the game Path of Exile"

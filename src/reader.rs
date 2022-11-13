@@ -51,7 +51,7 @@ pub struct BundleIndex {
 pub struct BundleReader {
     install_path: String,
     pub index: BundleIndex,
-    ggpk: GGPK,
+    ggpk: Option<GGPK>,
 }
 
 pub trait BundleFileRead {
@@ -65,12 +65,20 @@ pub trait BundleReaderRead {
 }
 
 impl BundleReader {
-    pub fn from_install(path: &str) -> BundleReader {
+    pub fn from_install(path: &Path) -> BundleReader {
         let index_bytes = BundleIndex::get_file(path, "Bundles2/_.index.bin");
 
+        let ggpk = if path.join("Bundles2/_.index.bin").exists() {
+            None
+        } else if path.is_file() {
+            Some(GGPK::from_file(path.to_str().unwrap()).unwrap())
+        } else {
+            Some(GGPK::from_path(path.to_str().unwrap()).unwrap())
+        };
+
         BundleReader {
-            ggpk: GGPK::from_path(path).unwrap(),
-            install_path: path.to_string(),
+            ggpk,
+            install_path: path.to_string_lossy().to_string(),
             index: BundleIndex::read_index(index_bytes.as_slice()),
         }
     }
@@ -97,8 +105,8 @@ impl BundleReaderRead for BundleReader {
                         )
                     })
                 } else {
-                    let bundle = self.ggpk.get_file(bundle_path.as_str());
-                    self.ggpk
+                    let bundle = self.ggpk.as_ref().unwrap().get_file(bundle_path.as_str());
+                    self.ggpk.as_ref().unwrap()
                         .mmap
                         .get(bundle.record.begin..(bundle.record.begin + bundle.record.bytes as usize))
                         .map(|bytes| {
@@ -139,8 +147,8 @@ impl BundleReaderRead for BundleReader {
                         )
                     })?;
                 } else {
-                    let bundle = self.ggpk.get_file(bundle_path.as_str());
-                    self.ggpk
+                    let bundle = self.ggpk.as_ref().unwrap().get_file(bundle_path.as_str());
+                    self.ggpk.as_ref().unwrap()
                         .mmap
                         .get(bundle.record.begin..(bundle.record.begin + bundle.record.bytes as usize))
                         .map(|bytes| {
@@ -166,12 +174,19 @@ impl BundleReaderRead for BundleReader {
 }
 
 impl BundleIndex {
-    fn get_file(install_path: &str, file_path: &str) -> Vec<u8> {
-        let disk_path = format!("{}/{}", install_path, file_path);
-        if Path::new(format!("{}", disk_path).as_str()).exists() {
-            fs::read(disk_path).expect("Unable to read")
+    fn get_file(install_path: &Path, file_path: &str) -> Vec<u8> {
+        let extracted_file = install_path.join(file_path);
+
+        if extracted_file.exists() {
+            fs::read(extracted_file).expect("Unable to read")
+        } else if install_path.is_file() {
+            let ggpk = GGPK::from_file(&install_path.to_string_lossy().to_string()).expect("Unable to read GGPK");
+            let file = ggpk.get_file(file_path);
+            let mut dst = Vec::with_capacity(file.record.bytes as usize);
+            file.write_into(&mut dst).unwrap();
+            dst
         } else {
-            let ggpk = GGPK::from_path(install_path).expect(install_path);
+            let ggpk = GGPK::from_path(install_path.to_str().unwrap()).expect("Unable to read GGPK");
             let file = ggpk.get_file(file_path);
             let mut dst = Vec::with_capacity(file.record.bytes as usize);
             file.write_into(&mut dst).unwrap();
