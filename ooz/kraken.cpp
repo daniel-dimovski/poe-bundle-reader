@@ -469,7 +469,12 @@ int Log2RoundUp(uint32 v) {
 }
 
 #define ALIGN_16(x) (((x)+15)&~15)
-#define COPY_64(d, s) {*(uint64*)(d) = *(uint64*)(s); }
+#define COPY_64(d, s)             \
+    {                             \
+        uint64_t tmpVal;          \
+        memcpy(&tmpVal, (s), 8);  \
+        memcpy((d), &tmpVal, 8);  \
+    }
 #define COPY_64_BYTES(d, s) {                                                 \
         _mm_storeu_si128((__m128i*)d + 0, _mm_loadu_si128((__m128i*)s + 0));  \
         _mm_storeu_si128((__m128i*)d + 1, _mm_loadu_si128((__m128i*)s + 1));  \
@@ -1368,8 +1373,8 @@ int Kraken_DecodeMultiArray(const uint8 *src, const uint8 *src_end,
     return src - src_org; // not supported yet
   }
 
-  uint8 *entropy_array_data[32];
-  uint32 entropy_array_size[32];
+  uint8 *entropy_array_data[63];
+  uint32 entropy_array_size[63];
 
   // First loop just decodes everything to scratch
   uint8 *scratch_cur = scratch;
@@ -3999,7 +4004,7 @@ int Mermaid_DecodeQuantum(byte *dst, byte *dst_end, byte *dst_start,
       if (src_end - src < src_used)
         return -1;
       if (src_used < dst_count) {
-        int temp_usage = 2 * dst_count + 32;
+        int temp_usage = 2 * dst_count + 32 + 0x4000; // Tans Lut may need upwards of 16k of temp storage
         if (temp_usage > 0x40000) temp_usage = 0x40000;
         if (!Mermaid_ReadLzTable(mode,
                                 src, src + src_used,
